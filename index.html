@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>MAXTEAR | © 2026</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root { --accent: #ff0055; }
+        body { background: #000; color: #fff; font-family: 'Inter', sans-serif; overflow-x: hidden; -webkit-tap-highlight-color: transparent; }
+
+        /* LIQUID AMBIANCE */
+        .mesh-bg {
+            position: fixed; inset: 0; z-index: -1;
+            background: radial-gradient(at 0% 0%, #1a1a2e 0px, transparent 50%),
+                        radial-gradient(at 100% 100%, #300 0px, transparent 50%);
+            filter: blur(100px); opacity: 0.5;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(40px) saturate(220%);
+            -webkit-backdrop-filter: blur(40px) saturate(220%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* NATIVE PLAYER CROP */
+        .player-viewport { position: relative; width: 100%; height: 100%; overflow: hidden; background: #000; }
+        #player {
+            position: absolute; top: -65px; left: -1%;
+            width: 102%; height: calc(100% + 130px);
+            pointer-events: none;
+        }
+
+        .seek-panel {
+            position: absolute; bottom: 0; left: 0; width: 100%; height: 100px;
+            z-index: 500; background: linear-gradient(to top, black, transparent);
+            padding: 0 60px; display: flex; align-items: center;
+        }
+        
+        input[type=range] {
+            width: 100%; appearance: none; background: rgba(255,255,255,0.1);
+            height: 4px; accent-color: var(--accent); cursor: pointer;
+        }
+
+        #auth-gate {
+            position: fixed; inset: 0; z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            background: #000; transition: transform 0.8s cubic-bezier(0.8, 0, 0.2, 1);
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="mesh-bg"></div>
+
+    <div id="auth-gate">
+        <div class="glass p-12 rounded-[3.5rem] w-full max-w-md text-center">
+            <h1 class="text-4xl font-black italic mb-2 tracking-tighter">MAX<span class="text-pink-600">TEAR</span></h1>
+            <p class="text-gray-500 text-[10px] uppercase tracking-widest mb-10 font-bold italic">Secure Access Vault</p>
+            <form onsubmit="handleAuth(event)" class="space-y-4">
+                <input type="email" id="email" required placeholder="Email" class="w-full bg-white/5 border border-white/10 px-6 py-4 rounded-2xl outline-none focus:border-pink-600 transition text-center">
+                <input type="password" id="pass" required placeholder="Key" class="w-full bg-white/5 border border-white/10 px-6 py-4 rounded-2xl outline-none focus:border-pink-600 transition text-center">
+                <button type="submit" class="w-full bg-white text-black font-black py-4 rounded-2xl hover:bg-pink-600 hover:text-white transition">UNLOCK DEVICE</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app" class="opacity-0 transition-opacity duration-1000 p-8 lg:p-16">
+        <header class="flex justify-between items-center mb-16">
+            <span class="text-3xl font-black italic tracking-tighter">MAX<span class="text-pink-600">TEAR</span></span>
+            <button onclick="logout()" class="text-[10px] text-gray-600 hover:text-white uppercase font-black tracking-widest border border-white/5 px-4 py-2 rounded-full">Reset Lock</button>
+        </header>
+
+        <div id="continue-section" class="mb-20 hidden">
+            <h2 class="text-xs font-black mb-6 tracking-[0.3em] uppercase text-pink-500 italic">Resume</h2>
+            <div id="continue-row" class="flex space-x-6 overflow-x-scroll no-scrollbar pb-6"></div>
+        </div>
+
+        <div id="catalog" class="space-y-20"></div>
+
+        <footer class="mt-40 pb-12 text-center">
+            <p class="text-[10px] uppercase tracking-[0.5em] font-bold text-gray-500">
+                © 2026 MAXTEAR | POWERED BY YOUTUBE
+            </p>
+        </footer>
+    </div>
+
+    <div id="modal" class="fixed inset-0 z-[10000] hidden bg-black">
+        <div class="player-viewport">
+            <div id="player"></div>
+            <div class="seek-panel"><input type="range" id="seek-bar" value="0"></div>
+            <button onclick="closeVid()" class="absolute top-10 right-10 text-white font-bold opacity-30 hover:opacity-100 glass px-8 py-3 rounded-full transition">CLOSE</button>
+        </div>
+    </div>
+
+    <script src="https://www.youtube.com/iframe_api"></script>
+    <script>
+        let ytPlayer, activeId;
+        const library = [
+            { id: 'k40cV4_4irY', title: 'Forgotten Soldier', cat: 'Trending' },
+            { id: 'DphM3_ntgPA', title: 'Amazon Core', cat: 'Trending' },
+            { id: 'skY6eCmEaKQ', title: 'Tide\'s End', cat: 'Cinema' },
+            { id: '4gcRwUiHAiA', title: 'Project Chimera', cat: 'Cinema' },
+            { id: 'tF7X3aGmDvs', title: 'Revolution', cat: 'Drama' },
+            { id: 'PpuptsJujlo', title: 'Chaos', cat: 'Comedy' },
+            { id: 'ScMzIvxBSi4', title: 'Cyber City', cat: 'Sci-Fi' },
+            { id: 'aqz-KE-bpKQ', title: 'Big Buck', cat: 'Animation' }
+        ];
+
+        function handleAuth(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value, pass = document.getElementById('pass').value;
+            const stored = JSON.parse(localStorage.getItem('max_auth'));
+            if(!stored) { localStorage.setItem('max_auth', JSON.stringify({email, pass})); openApp(); }
+            else if(stored.email === email && stored.pass === pass) openApp();
+            else alert("Key Error.");
+        }
+
+        function openApp() {
+            document.getElementById('auth-gate').style.transform = 'translateY(-100%)';
+            document.getElementById('app').classList.replace('opacity-0', 'opacity-100');
+            renderContent();
+        }
+
+        function renderContent() {
+            const cats = [...new Set(library.map(m => m.cat))];
+            document.getElementById('catalog').innerHTML = cats.map(c => `
+                <div>
+                    <h2 class="text-xl font-bold mb-8 opacity-20 uppercase tracking-[0.4em]">${c}</h2>
+                    <div class="flex space-x-6 overflow-x-scroll no-scrollbar">
+                        ${library.filter(m => m.cat === c).map(m => `
+                            <div onclick="play('${m.id}')" class="glass p-5 min-w-[300px] rounded-[2.5rem] cursor-pointer hover:scale-105 transition-all">
+                                <img src="https://img.youtube.com/vi/${m.id}/mqdefault.jpg" class="rounded-[1.8rem] w-full mb-4">
+                                <h3 class="font-bold px-2 truncate italic tracking-tight">${m.title}</h3>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            const prog = JSON.parse(localStorage.getItem('max_prog') || '{}');
+            const ids = Object.keys(prog).reverse();
+            if(ids.length > 0) {
+                document.getElementById('continue-section').classList.remove('hidden');
+                document.getElementById('continue-row').innerHTML = ids.map(id => {
+                    const m = library.find(x => x.id === id);
+                    return m ? `<div onclick="play('${m.id}', ${prog[id]})" class="glass p-4 min-w-[240px] rounded-[2.2rem] cursor-pointer opacity-50 hover:opacity-100 transition">
+                        <img src="https://img.youtube.com/vi/${m.id}/mqdefault.jpg" class="rounded-[1.5rem] w-full mb-2">
+                        <div class="px-2 text-[10px] font-black uppercase text-pink-500 tracking-widest">Resume</div>
+                    </div>` : '';
+                }).join('');
+            }
+        }
+
+        function play(id, start = 0) {
+            activeId = id;
+            document.getElementById('modal').classList.remove('hidden');
+            if(ytPlayer) ytPlayer.loadVideoById({videoId: id, startSeconds: start});
+            else {
+                ytPlayer = new YT.Player('player', {
+                    videoId: id, playerVars: {autoplay:1, controls:0, start:start, disablekb:1},
+                    events: { onReady: () => {
+                        const bar = document.getElementById('seek-bar');
+                        setInterval(() => {
+                            if(ytPlayer?.getCurrentTime) {
+                                const t = ytPlayer.getCurrentTime();
+                                bar.max = ytPlayer.getDuration(); bar.value = t;
+                                const p = JSON.parse(localStorage.getItem('max_prog') || '{}');
+                                p[activeId] = Math.floor(t);
+                                localStorage.setItem('max_prog', JSON.stringify(p));
+                            }
+                        }, 2000);
+                        bar.oninput = () => ytPlayer.seekTo(bar.value);
+                    }}
+                });
+            }
+        }
+
+        function closeVid() { if(ytPlayer) ytPlayer.stopVideo(); document.getElementById('modal').classList.add('hidden'); renderContent(); }
+        function logout() { localStorage.clear(); location.reload(); }
+    </script>
+</body>
+</html>
